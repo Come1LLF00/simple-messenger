@@ -34,7 +34,7 @@ int main(int argc, char *argv[]) {
 
   if (sockfd < 0) {
     perror("ERROR opening socket");
-    exit(-errno);
+    exit(errno);
   }
 
   bzero((char *)&serv_addr, sizeof(serv_addr));
@@ -46,7 +46,7 @@ int main(int argc, char *argv[]) {
   /* Now connect to the server */
   if (connect(sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {
     perror("ERROR connecting");
-    exit(-errno);
+    exit(errno);
   }
 
   /* Now ask for a message from the user, this message
