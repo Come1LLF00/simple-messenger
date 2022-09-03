@@ -9,11 +9,14 @@
 
 #include <errno.h>
 
-// #include "proto/client.h"
+#include <inttypes.h>
+
+#include "proto/client.h"
 
 struct client {
   struct hostent* server;
   uint16_t port_nr;
+  uint32_t nickname_size;
   char* nickname;
 };
 
@@ -52,15 +55,26 @@ int main(int argc, char *argv[]) {
    */
 
   char* message = NULL;
-  size_t length = 0;
+  size_t allocated_length = 0;
   printf("Please enter the message: ");
-  if (getline(&message, &length, stdin) == -1) {
+  if (getline(&message, &allocated_length, stdin) == -1) {
+    free(message);
     perror("ERROR reading from stdin");
     exit(errno);
   }
 
   /* Send message to the server */
-  int n = write(sockfd, message, strlen(message));
+  size_t msg_length = strlen(message);
+  char* payload = NULL;
+  size_t payload_length = client_msg_serialize({me.nickname_size, me.nickname, (uint32_t) msg_length, message}, 0, &payload);
+  printf("sent sizes: %" PRIu32 "; %zu\n", me.nickname_size, msg_length);
+  printf("[%.*s]: %.*s\n",
+    (int) me.nickname_size, me.nickname,
+    (int) msg_length, message);
+
+  int n = write(sockfd, payload, payload_length);
+  free(payload);
+  free(message);
 
   if (n < 0) {
     perror("ERROR writing to socket");
@@ -68,15 +82,26 @@ int main(int argc, char *argv[]) {
   }
 
   /* Now read server response */
-  bzero(message, 256);
-  n = read(sockfd, message, 255);
+  char buffer[256];
+  bzero(buffer, 256);
+  n = read(sockfd, buffer, 255);
+
+  struct server_msg response = server_msg_deserialize(buffer);
 
   if (n < 0) {
     perror("ERROR reading from socket");
-    exit(1);
+    exit(errno);
   }
 
-  printf("%s\n", message);
+  printf("sizes: %" PRIu32 "; %" PRIu32 "; %" PRIu32 "\n", response.date_size, response.nickname_size, response.body_size);
+  printf("{%.*s} [%.*s]: %.*s\n",
+    (int) response.date_size, response.date,
+    (int) response.nickname_size, response.nickname,
+    (int) response.body_size, response.body);
+
+  free(response.body);
+  free(response.date);
+  free(response.nickname);
   return 0;
 }
 
@@ -87,7 +112,7 @@ static struct client parse_args(int argc, char** argv) {
     exit(EINVAL);
   }
 
-  struct client me = {0, 0, 0};
+  struct client me = {0, 0, 0, 0};
   me.server = gethostbyname(argv[1]);
 
   if (me.server == NULL) {
@@ -97,6 +122,6 @@ static struct client parse_args(int argc, char** argv) {
 
   me.port_nr = (uint16_t) strtoul(argv[2], NULL, 10);
   me.nickname = argv[3];
-
+  me.nickname_size = strlen(argv[3]);
   return me;
 }

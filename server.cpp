@@ -7,7 +7,11 @@
 
 #include <string.h>
 
-// #include "proto/server.h"
+#include <time.h>
+#include <inttypes.h>
+
+#include "proto/server.h"
+
 
 int main(int argc, char *argv[]) {
   (void)argc;
@@ -59,17 +63,42 @@ int main(int argc, char *argv[]) {
   /* If connection is established then start communicating */
   bzero(buffer, 256);
   n = read(newsockfd, buffer, 255);
+  printf("n = %zd\n", n);
 
   if (n < 0) {
     perror("ERROR reading from socket");
     exit(1);
   }
 
-  printf("Here is the message: %s\n", buffer);
+  struct client_msg message = client_msg_deserialize(buffer);
+  time_t now = time(NULL);
+  struct tm* local_now = localtime(&now);
+
+  char now_line[256];
+  strftime(now_line, 255, "%H:%M", local_now);
+  const uint32_t now_len = (uint32_t) strlen(now_line);
+  printf("sizes: %" PRIu32 "; %" PRIu32 "; %" PRIu32"\n", now_len, message.nickname_size, message.body_size);
+  printf("{%.*s} [%.*s]: %.*s", (int) now_len, now_line, (int) message.nickname_size, message.nickname, (int) message.body_size, message.body);
 
   /* Write a response to the client */
-  n = write(newsockfd, "I got your message", 18);
+  char* body = (char*) "I got your message";
+  struct server_msg response = {
+    message.nickname_size,
+    message.nickname,
+    (uint32_t) strlen(body),
+    body,
+    now_len,
+    now_line
+  };
 
+  
+  char* payload = NULL;
+  size_t length = server_msg_serialize(response, &payload);
+  n = write(newsockfd, payload, length);
+
+  free(message.body);
+  free(message.nickname);
+  
   if (n < 0) {
     perror("ERROR writing to socket");
     exit(1);
