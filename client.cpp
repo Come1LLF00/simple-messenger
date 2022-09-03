@@ -7,51 +7,46 @@
 
 #include <string.h>
 
-#include "proto/client.h"
+#include <errno.h>
+
+// #include "proto/client.h"
+
+struct client {
+  struct hostent* server;
+  uint16_t port_nr;
+  char* nickname;
+};
+
+
+static struct client parse_args(int, char**);
 
 
 int main(int argc, char *argv[]) {
-  (void)argc;
-  (void)argv;
+  struct client me = parse_args(argc, argv);
+
   int sockfd, n;
-  uint16_t portno;
   struct sockaddr_in serv_addr;
-  struct hostent *server;
 
   char buffer[256];
-
-  if (argc < 3) {
-    fprintf(stderr, "usage %s hostname port\n", argv[0]);
-    exit(0);
-  }
-
-  portno = (uint16_t)atoi(argv[2]);
 
   /* Create a socket point */
   sockfd = socket(AF_INET, SOCK_STREAM, 0);
 
   if (sockfd < 0) {
     perror("ERROR opening socket");
-    exit(1);
-  }
-
-  server = gethostbyname(argv[1]);
-
-  if (server == NULL) {
-    fprintf(stderr, "ERROR, no such host\n");
-    exit(0);
+    exit(-errno);
   }
 
   bzero((char *)&serv_addr, sizeof(serv_addr));
   serv_addr.sin_family = AF_INET;
-  bcopy(server->h_addr, (char *)&serv_addr.sin_addr.s_addr,
-        (size_t)server->h_length);
-  serv_addr.sin_port = htons(portno);
+  bcopy(me.server->h_addr, (char *)&serv_addr.sin_addr.s_addr,
+        (size_t)me.server->h_length);
+  serv_addr.sin_port = htons(me.port_nr);
 
   /* Now connect to the server */
   if (connect(sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {
     perror("ERROR connecting");
-    exit(1);
+    exit(-errno);
   }
 
   /* Now ask for a message from the user, this message
@@ -84,4 +79,25 @@ int main(int argc, char *argv[]) {
 
   printf("%s\n", buffer);
   return 0;
+}
+
+
+static struct client parse_args(int argc, char** argv) {
+  if (argc < 4) {
+    fprintf(stderr, "usage %s [hostname] [port] [nickname]\n", argv[0]);
+    exit(EINVAL);
+  }
+
+  struct client me = {0, 0, 0};
+  me.server = gethostbyname(argv[1]);
+
+  if (me.server == NULL) {
+    herror("ERROR");
+    exit(h_errno);
+  }
+
+  me.port_nr = (uint16_t) strtoul(argv[2], NULL, 10);
+  me.nickname = argv[3];
+
+  return me;
 }

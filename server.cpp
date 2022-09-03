@@ -7,8 +7,7 @@
 
 #include <string.h>
 
-#include "proto/server.h"
-
+// #include "proto/server.h"
 
 int main(int argc, char *argv[]) {
   (void)argc;
