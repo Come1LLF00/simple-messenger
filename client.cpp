@@ -24,24 +24,22 @@ static struct client parse_args(int, char**);
 int main(int argc, char *argv[]) {
   struct client me = parse_args(argc, argv);
 
-  int sockfd, n;
-  struct sockaddr_in serv_addr;
-
-  char buffer[256];
 
   /* Create a socket point */
-  sockfd = socket(AF_INET, SOCK_STREAM, 0);
+  int sockfd = socket(AF_INET, SOCK_STREAM, 0);
 
   if (sockfd < 0) {
     perror("ERROR opening socket");
     exit(errno);
   }
 
+  struct sockaddr_in serv_addr;
   bzero((char *)&serv_addr, sizeof(serv_addr));
   serv_addr.sin_family = AF_INET;
+  serv_addr.sin_port = htons(me.port_nr);
+  
   bcopy(me.server->h_addr, (char *)&serv_addr.sin_addr.s_addr,
         (size_t)me.server->h_length);
-  serv_addr.sin_port = htons(me.port_nr);
 
   /* Now connect to the server */
   if (connect(sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {
@@ -53,15 +51,16 @@ int main(int argc, char *argv[]) {
    * will be read by server
    */
 
+  char* message = NULL;
+  size_t length = 0;
   printf("Please enter the message: ");
-  bzero(buffer, 256);
-  if (fgets(buffer, 255, stdin) == NULL) {
+  if (getline(&message, &length, stdin) == -1) {
     perror("ERROR reading from stdin");
-    exit(1);
+    exit(errno);
   }
 
   /* Send message to the server */
-  n = write(sockfd, buffer, strlen(buffer));
+  int n = write(sockfd, message, strlen(message));
 
   if (n < 0) {
     perror("ERROR writing to socket");
@@ -69,15 +68,15 @@ int main(int argc, char *argv[]) {
   }
 
   /* Now read server response */
-  bzero(buffer, 256);
-  n = read(sockfd, buffer, 255);
+  bzero(message, 256);
+  n = read(sockfd, message, 255);
 
   if (n < 0) {
     perror("ERROR reading from socket");
     exit(1);
   }
 
-  printf("%s\n", buffer);
+  printf("%s\n", message);
   return 0;
 }
 
