@@ -25,22 +25,8 @@ struct client {
 
 static struct client parse_args(int, char**);
 
-static bool running = true;
-
-static void stop_client(int signum) {
-  (void) signum;
-  /* sighandler_t old_handler = */ signal(SIGINT, stop_client);
-  running = false;
-}
-
 
 int main(int argc, char *argv[]) {
-  sighandler_t old_handler = signal(SIGINT, stop_client);
-  if (old_handler == SIG_ERR) {
-    perror("ERROR can't reassign SIGINT handler");
-    exit(errno);
-  }
-
   struct client me = parse_args(argc, argv);
 
 
@@ -68,67 +54,66 @@ int main(int argc, char *argv[]) {
     exit(errno);
   }
 
-  while (running) {
-    /* Now ask for a message from the user, this message
-    * will be read by server
-    */
 
-    char* message = NULL;
-    size_t allocated_length = 0;
-    printf("Please enter the message: ");
-    if (getline(&message, &allocated_length, stdin) == -1) {
-      free(message);
-      perror("ERROR reading from stdin");
-      exit(errno);
-    }
+  /* Now ask for a message from the user, this message
+  * will be read by server
+  */
 
-    /* Send message to the server */
-    size_t msg_length = strlen(message);
-    char* payload = NULL;
-    size_t payload_length = client_msg_serialize({me.nickname_size, me.nickname, (uint32_t) msg_length, message}, 0, &payload);
-    printf("sent sizes: %" PRIu32 "; %zu\n", me.nickname_size, msg_length);
-    printf("[%.*s]: %.*s\n",
-      (int) me.nickname_size, me.nickname,
-      (int) msg_length, message);
-
-    ssize_t n = send(sockfd, payload, payload_length, MSG_NOSIGNAL);
-    free(payload);
+  char* message = NULL;
+  size_t allocated_length = 0;
+  printf("Please enter the message: ");
+  if (getline(&message, &allocated_length, stdin) == -1) {
     free(message);
-
-    if (n < 0) {
-      perror("ERROR writing to socket");
-      exit(1);
-    }
-
-    /* Now read server response */
-    char buffer[256];
-    // bzero(buffer, 256);
-    memset(buffer, 0, 256);
-    n = recv(sockfd, buffer, 255, MSG_NOSIGNAL);
-
-    if (n < 0) {
-      perror("ERROR reading from socket");
-      exit(errno);
-    }
-
-    if (n == 0 && errno != EAGAIN) {
-      fprintf(stderr, "Connection lost\n");
-      exit(1);
-    }
-
-    struct server_msg response = server_msg_deserialize(buffer);
-
-
-    printf("sizes: %" PRIu32 "; %" PRIu32 "; %" PRIu32 "\n", response.date_size, response.nickname_size, response.body_size);
-    printf("{%.*s} [%.*s]: %.*s\n",
-      (int) response.date_size, response.date,
-      (int) response.nickname_size, response.nickname,
-      (int) response.body_size, response.body);
-    
-    free(response.body);
-    free(response.date);
-    free(response.nickname);
+    perror("ERROR reading from stdin");
+    exit(errno);
   }
+
+  /* Send message to the server */
+  size_t msg_length = strlen(message);
+  char* payload = NULL;
+  size_t payload_length = client_msg_serialize({me.nickname_size, me.nickname, (uint32_t) msg_length, message}, 0, &payload);
+  printf("sent sizes: %" PRIu32 "; %zu\n", me.nickname_size, msg_length);
+  printf("[%.*s]: %.*s\n",
+    (int) me.nickname_size, me.nickname,
+    (int) msg_length, message);
+
+  ssize_t n = send(sockfd, payload, payload_length, MSG_NOSIGNAL);
+  free(payload);
+  free(message);
+
+  if (n < 0) {
+    perror("ERROR writing to socket");
+    exit(1);
+  }
+
+  /* Now read server response */
+  char buffer[256];
+  // bzero(buffer, 256);
+  memset(buffer, 0, 256);
+  n = recv(sockfd, buffer, 255, MSG_NOSIGNAL);
+
+  if (n < 0) {
+    perror("ERROR reading from socket");
+    exit(errno);
+  }
+
+  if (n == 0 && errno != EAGAIN) {
+    fprintf(stderr, "Connection lost\n");
+    exit(1);
+  }
+
+  struct server_msg response = server_msg_deserialize(buffer);
+
+
+  printf("sizes: %" PRIu32 "; %" PRIu32 "; %" PRIu32 "\n", response.date_size, response.nickname_size, response.body_size);
+  printf("{%.*s} [%.*s]: %.*s\n",
+    (int) response.date_size, response.date,
+    (int) response.nickname_size, response.nickname,
+    (int) response.body_size, response.body);
+  
+  free(response.body);
+  free(response.date);
+  free(response.nickname);
 
   shutdown(sockfd, SHUT_RDWR);
   close(sockfd);
