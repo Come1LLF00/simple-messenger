@@ -4,6 +4,9 @@
 #include <netdb.h>
 #include <netinet/in.h>
 #include <unistd.h>
+#include <getopt.h>
+
+#include <errno.h>
 
 #include <string.h>
 
@@ -14,34 +17,33 @@
 #include "proto/server.h"
 
 
+static uint16_t parse_args(int, char**);
+
+
 int main(int argc, char *argv[]) {
-  (void)argc;
-  (void)argv;
-  int sockfd, newsockfd;
-  uint16_t portno;
-  unsigned int clilen;
-  char buffer[256];
-  struct sockaddr_in serv_addr, cli_addr;
+  uint16_t port_nr = parse_args(argc, argv);
+
 
   /* First call to socket() function */
-  sockfd = socket(AF_INET, SOCK_STREAM, 0);
+  int masterfd = socket(AF_INET, SOCK_STREAM, 0);
 
-  if (sockfd < 0) {
+  if (masterfd < 0) {
     perror("ERROR opening socket");
     exit(1);
   }
 
   /* Initialize socket structure */
   // bzero((char *)&serv_addr, sizeof(serv_addr));
+  struct sockaddr_in serv_addr;
   memset(&serv_addr, 0, sizeof(serv_addr));
-  portno = 5001;
+  port_nr = 5001;
 
   serv_addr.sin_family = AF_INET;
   serv_addr.sin_addr.s_addr = INADDR_ANY;
-  serv_addr.sin_port = htons(portno);
+  serv_addr.sin_port = htons(port_nr);
 
   /* Now bind the host address using bind() call.*/
-  if (bind(sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {
+  if (bind(masterfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {
     perror("ERROR on binding");
     exit(1);
   }
@@ -49,23 +51,28 @@ int main(int argc, char *argv[]) {
   /* Now start listening for the clients, here process will
    * go in sleep mode and will wait for the incoming connection
    */
-
-  listen(sockfd, 5);
-  clilen = sizeof(cli_addr);
+  listen(masterfd, 5);
+  struct sockaddr_in cli_addr;
+  unsigned int clilen = sizeof(cli_addr);
 
   /* Accept actual connection from the client */
-  newsockfd = accept(sockfd, (struct sockaddr *)&cli_addr, &clilen);
+  int slavefd = accept(masterfd, (struct sockaddr *)&cli_addr, &clilen);
 
-  if (newsockfd < 0) {
+  if (slavefd < 0) {
     perror("ERROR on accept");
     exit(1);
   }
 
   /* If connection is established then start communicating */
   // bzero(buffer, 256);
+  char buffer[256];
   memset(buffer, 0, 256);
-  ssize_t n = recv(newsockfd, buffer, 255, MSG_NOSIGNAL);
-  printf("n = %zd\n", n);
+  ssize_t n = recv(slavefd, buffer, 255, MSG_NOSIGNAL);
+
+  if (n == 0 && errno != EAGAIN) {
+    fprintf(stderr, "Connection lost\n");
+    exit(1);
+  }
 
   if (n < 0) {
     perror("ERROR reading from socket");
@@ -96,7 +103,7 @@ int main(int argc, char *argv[]) {
   
   char* payload = NULL;
   size_t length = server_msg_serialize(response, &payload);
-  n = send(newsockfd, payload, length, MSG_NOSIGNAL);
+  n = send(slavefd, payload, length, MSG_NOSIGNAL);
 
   free(message.body);
   free(message.nickname);
@@ -106,10 +113,20 @@ int main(int argc, char *argv[]) {
     exit(1);
   }
 
-  shutdown(newsockfd, SHUT_RDWR);
+  shutdown(slavefd, SHUT_RDWR);
 
-  close(newsockfd);
+  close(slavefd);
 
-  close(sockfd);
+  close(masterfd);
   return 0;
+}
+
+
+static uint16_t parse_args(int argc, char** argv) {
+  if (argc < 2) {
+    fprintf(stderr, "usage %s [port]\n", argv[0]);
+    exit(EINVAL);
+  }
+
+  return (uint16_t) strtoul(argv[1], NULL, 10);
 }
