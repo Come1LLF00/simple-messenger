@@ -10,6 +10,7 @@
 #include <time.h>
 #include <inttypes.h>
 
+
 #include "proto/server.h"
 
 
@@ -21,7 +22,6 @@ int main(int argc, char *argv[]) {
   unsigned int clilen;
   char buffer[256];
   struct sockaddr_in serv_addr, cli_addr;
-  ssize_t n;
 
   /* First call to socket() function */
   sockfd = socket(AF_INET, SOCK_STREAM, 0);
@@ -32,7 +32,8 @@ int main(int argc, char *argv[]) {
   }
 
   /* Initialize socket structure */
-  bzero((char *)&serv_addr, sizeof(serv_addr));
+  // bzero((char *)&serv_addr, sizeof(serv_addr));
+  memset(&serv_addr, 0, sizeof(serv_addr));
   portno = 5001;
 
   serv_addr.sin_family = AF_INET;
@@ -61,8 +62,9 @@ int main(int argc, char *argv[]) {
   }
 
   /* If connection is established then start communicating */
-  bzero(buffer, 256);
-  n = read(newsockfd, buffer, 255);
+  // bzero(buffer, 256);
+  memset(buffer, 0, 256);
+  ssize_t n = recv(newsockfd, buffer, 255, MSG_NOSIGNAL);
   printf("n = %zd\n", n);
 
   if (n < 0) {
@@ -94,7 +96,7 @@ int main(int argc, char *argv[]) {
   
   char* payload = NULL;
   size_t length = server_msg_serialize(response, &payload);
-  n = write(newsockfd, payload, length);
+  n = send(newsockfd, payload, length, MSG_NOSIGNAL);
 
   free(message.body);
   free(message.nickname);
@@ -104,5 +106,10 @@ int main(int argc, char *argv[]) {
     exit(1);
   }
 
+  shutdown(newsockfd, SHUT_RDWR);
+
+  close(newsockfd);
+
+  close(sockfd);
   return 0;
 }

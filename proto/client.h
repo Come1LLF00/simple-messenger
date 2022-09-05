@@ -15,7 +15,7 @@ static struct server_msg server_msg_deserialize(char* data) {
   datp += sizeof(date_size);
 
   char* date = (char*) malloc(date_size);
-  snprintf(date, date_size, "%s", datp);
+  memcpy(date, datp, date_size);
 
   return {msg.nickname_size, msg.nickname, msg.body_size, msg.body, date_size, date};
 }
