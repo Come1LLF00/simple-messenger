@@ -13,9 +13,15 @@
 
 #include <signal.h> // handle interruption
 
+#include <termios.h>
+
+#include <pthread.h>
+
 #include "proto/client.h"
 
+
 struct client {
+  int sockfd;
   struct hostent* server;
   uint16_t port_nr;
   uint32_t nickname_size;
@@ -23,24 +29,40 @@ struct client {
 };
 
 
+static struct termios orig_term_attr;
+
+static void client_stop(int signum) {
+  (void) signum;
+  tcsetattr(fileno(stdin), TCSANOW, &orig_term_attr);
+  exit(0);
+}
+
+
+static int should_input_stop = false;
+
+
 static struct client parse_args(int, char**);
 
 
+static void* send_msg_routine(void*);
+
+
 int main(int argc, char *argv[]) {
+  signal(SIGINT, client_stop);
+
   struct client me = parse_args(argc, argv);
 
 
   /* Create a socket point */
-  int sockfd = socket(AF_INET, SOCK_STREAM, 0);
+  me.sockfd = socket(AF_INET, SOCK_STREAM, 0);
 
-  if (sockfd < 0) {
+  if (me.sockfd < 0) {
     perror("ERROR opening socket");
     exit(errno);
   }
 
   struct sockaddr_in serv_addr;
-  // bzero((char *)&serv_addr, sizeof(serv_addr));
-  memset(&serv_addr, 0, sizeof(serv_addr));
+  memset(&serv_addr, 0, sizeof(serv_addr)); // bzero((char *)&serv_addr, sizeof(serv_addr));
   serv_addr.sin_family = AF_INET;
   serv_addr.sin_port = htons(me.port_nr);
   
@@ -49,76 +71,55 @@ int main(int argc, char *argv[]) {
   memcpy(&serv_addr.sin_addr.s_addr, me.server->h_addr, (size_t)me.server->h_length);
 
   /* Now connect to the server */
-  if (connect(sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {
+  if (connect(me.sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {
     perror("ERROR connecting");
     exit(errno);
   }
 
+  pthread_t client_input;
+  pthread_create(&client_input, NULL, send_msg_routine, &me);
 
-  /* Now ask for a message from the user, this message
-  * will be read by server
-  */
+  int return_code = 0;
+  while (1) {
+    /* Now read server response */
+    char buffer[256];
+    memset(buffer, 0, 256); // bzero(buffer, 256);
+    ssize_t n = recv(me.sockfd, buffer, 255, MSG_NOSIGNAL);
 
-  char* message = NULL;
-  size_t allocated_length = 0;
-  printf("Please enter the message: ");
-  if (getline(&message, &allocated_length, stdin) == -1) {
-    free(message);
-    perror("ERROR reading from stdin");
-    exit(errno);
+    if (n == 0 && errno != EAGAIN) {
+      fprintf(stderr, "Connection lost\n");
+      should_input_stop = true;
+      return_code = 1;
+      break;
+    }
+
+    if (n < 0) {
+      perror("ERROR reading from socket");
+      should_input_stop = true;
+      return_code = errno;
+      break;
+    }
+
+    struct server_msg response = server_msg_deserialize(buffer);
+#if 0
+    printf("sizes: %" PRIu32 "; %" PRIu32 "; %" PRIu32 "\n", response.date_size, response.nickname_size, response.body_size);
+#endif
+    printf("{%.*s} [%.*s]: %.*s",
+      (int) response.date_size, response.date,
+      (int) response.nickname_size, response.nickname,
+      (int) response.body_size, response.body);
+    
+    free(response.body);
+    free(response.date);
+    free(response.nickname);
   }
 
-  /* Send message to the server */
-  size_t msg_length = strlen(message);
-  char* payload = NULL;
-  size_t payload_length = client_msg_serialize({me.nickname_size, me.nickname, (uint32_t) msg_length, message}, 0, &payload);
-  printf("sent sizes: %" PRIu32 "; %zu\n", me.nickname_size, msg_length);
-  printf("[%.*s]: %.*s\n",
-    (int) me.nickname_size, me.nickname,
-    (int) msg_length, message);
+  pthread_join(client_input, NULL);
 
-  ssize_t n = send(sockfd, payload, payload_length, MSG_NOSIGNAL);
-  free(payload);
-  free(message);
+  shutdown(me.sockfd, SHUT_RDWR);
+  close(me.sockfd);
 
-  if (n < 0) {
-    perror("ERROR writing to socket");
-    exit(1);
-  }
-
-  /* Now read server response */
-  char buffer[256];
-  // bzero(buffer, 256);
-  memset(buffer, 0, 256);
-  n = recv(sockfd, buffer, 255, MSG_NOSIGNAL);
-
-  if (n < 0) {
-    perror("ERROR reading from socket");
-    exit(errno);
-  }
-
-  if (n == 0 && errno != EAGAIN) {
-    fprintf(stderr, "Connection lost\n");
-    exit(1);
-  }
-
-  struct server_msg response = server_msg_deserialize(buffer);
-
-
-  printf("sizes: %" PRIu32 "; %" PRIu32 "; %" PRIu32 "\n", response.date_size, response.nickname_size, response.body_size);
-  printf("{%.*s} [%.*s]: %.*s\n",
-    (int) response.date_size, response.date,
-    (int) response.nickname_size, response.nickname,
-    (int) response.body_size, response.body);
-  
-  free(response.body);
-  free(response.date);
-  free(response.nickname);
-
-  shutdown(sockfd, SHUT_RDWR);
-  close(sockfd);
-
-  return 0;
+  return return_code;
 }
 
 
@@ -128,7 +129,7 @@ static struct client parse_args(int argc, char** argv) {
     exit(EINVAL);
   }
 
-  struct client me = {0, 0, 0, 0};
+  struct client me = {0, 0, 0, 0, 0};
   me.server = gethostbyname(argv[1]);
 
   if (me.server == NULL) {
@@ -140,4 +141,71 @@ static struct client parse_args(int argc, char** argv) {
   me.nickname = argv[3];
   me.nickname_size = strlen(argv[3]);
   return me;
+}
+
+
+static int getkey() {
+    int character;
+    struct termios new_term_attr;
+
+    /* set the terminal to raw mode */
+    tcgetattr(fileno(stdin), &orig_term_attr);
+    memcpy(&new_term_attr, &orig_term_attr, sizeof(struct termios));
+    new_term_attr.c_lflag &= ~(ECHO|ICANON);
+    // new_term_attr.c_cc[VTIME] = 0;
+    // new_term_attr.c_cc[VMIN] = 0;
+    tcsetattr(fileno(stdin), TCSANOW, &new_term_attr);
+
+    /* read a character from the stdin stream without blocking */
+    /*   returns EOF (-1) if no character is available */
+    character = fgetc(stdin);
+
+    /* restore the original terminal attributes */
+    tcsetattr(fileno(stdin), TCSANOW, &orig_term_attr);
+
+    return character;
+}
+
+
+static void* send_msg_routine(void* arg) {
+
+  struct client* me_p = (struct client*) arg;
+  while (!should_input_stop) {
+    int key = getkey();
+    if (key == 'm') {
+      /* Now ask for a message from the user, this message
+      * will be read by server
+      */
+      char* message = NULL;
+      size_t allocated_length = 0;
+      printf("> ");
+      if (getline(&message, &allocated_length, stdin) == -1) {
+        free(message);
+        perror("ERROR reading from stdin");
+        return (void*) errno;
+      }
+
+      /* Send message to the server */
+      size_t msg_length = strlen(message);
+      char* payload = NULL;
+      size_t payload_length = client_msg_serialize({me_p->nickname_size, me_p->nickname, (uint32_t) msg_length, message}, 0, &payload);
+#if 0
+      printf("sent sizes: %" PRIu32 "; %zu\n", me_p->nickname_size, msg_length);
+      printf("[%.*s]: %.*s",
+        (int) me_p->nickname_size, me_p->nickname,
+        (int) msg_length, message);
+#endif
+
+      ssize_t n = send(me_p->sockfd, payload, payload_length, MSG_NOSIGNAL);
+      free(payload);
+      free(message);
+
+      if (n < 0) {
+        perror("ERROR writing to socket");
+        return (void*) 1;
+      }
+    }
+  }
+  
+  return nullptr;
 }

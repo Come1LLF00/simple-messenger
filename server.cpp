@@ -34,12 +34,6 @@ struct clients_context {
 
 static pthread_mutex_t context_lock;
 
-static bool should_stop = false;
-
-static void server_stop(int signum) {
-  (void) signum;
-  should_stop = true;
-}
 
 static uint16_t parse_args(int, char**);
 
@@ -47,7 +41,6 @@ static void* client_handler(void*);
 
 
 int main(int argc, char *argv[]) {
-  signal(SIGINT, server_stop);
   uint16_t port_nr = parse_args(argc, argv);
 
 
@@ -75,19 +68,16 @@ int main(int argc, char *argv[]) {
 
   /* Now start listening for the clients */
   listen(server_fd, MAX_PENDING_CONN);
-  fcntl(server_fd, F_SETFL, O_NONBLOCK); 
   pthread_mutex_init(&context_lock, NULL);
 
   std::set<int> client_fds;
   std::set<pthread_t> clients;
-  while (!should_stop) {
+  while (1) {
   
     /* Accept actual connection from the client */
     struct {struct sockaddr_in address; unsigned int length; int fd;} client;
     client.length = sizeof(client.address);
     client.fd = accept(server_fd, (struct sockaddr *)&(client.address), &(client.length));
-    if (client.fd < 0 && (errno == EAGAIN || errno == EWOULDBLOCK))
-      continue;
 
     if (client.fd < 0) {
       perror("ERROR on accept");

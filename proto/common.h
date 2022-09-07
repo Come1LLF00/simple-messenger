@@ -60,15 +60,18 @@ static struct client_msg client_msg_deserialize(char* data) {
   datp += sizeof(nickname_size);
 
   char* nickname = (char*) malloc(nickname_size);
+#if 0
   printf("Got message from: %.*s\n", nickname_size, datp);
+#endif
   
   memcpy(nickname, datp, nickname_size);
   datp += nickname_size;
 
   uint32_t body_size = uint32_t_deserialize(datp);
   datp += sizeof(body_size);
-
+#if 0
   printf("deserialized sizes: %" PRIu32 "; %" PRIu32 "\n", nickname_size, body_size);
+#endif
   char* body = (char*) malloc(body_size);
   memcpy(body, datp, body_size);
   
