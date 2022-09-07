@@ -172,7 +172,7 @@ static void* send_msg_routine(void* arg) {
       if (getline(&message, &allocated_length, stdin) == -1) {
         free(message);
         perror("ERROR reading from stdin");
-        return (void*)errno;
+        return (void*)(uintptr_t)errno;
       }
 
       /* Send message to the server */
@@ -194,7 +194,7 @@ static void* send_msg_routine(void* arg) {
 
       if (n < 0) {
         perror("ERROR writing to socket");
-        return (void*)1;
+        return (void*)(uintptr_t)1;
       }
     }
   }
