@@ -138,9 +138,11 @@ static void* client_handler(void* arg) {
 
   while (1) {
     /* If connection is established then start communicating */
+    pthread_mutex_lock(&context_lock);
     char buffer[MAX_LENGTH];
     memset(buffer, 0, MAX_LENGTH);  // bzero(buffer, 256);
     ssize_t count = recv(context.client, buffer, MAX_LENGTH - 1, MSG_NOSIGNAL);
+    pthread_mutex_unlock(&context_lock);
 
     // check if connection to client lost
     if (count == 0 && errno != EAGAIN) {
