@@ -13,8 +13,6 @@
 
 #include <signal.h>  // handle interruption
 
-#include <termios.h>
-
 #include <pthread.h>
 
 #include "proto/client.h"
@@ -27,11 +25,8 @@ struct client {
   char* nickname;
 };
 
-static struct termios orig_term_attr;
-
 static void client_stop(int signum) {
   (void)signum;
-  tcsetattr(fileno(stdin), TCSANOW, &orig_term_attr);
   exit(0);
 }
 
@@ -136,33 +131,13 @@ static struct client parse_args(int argc, char** argv) {
   return me;
 }
 
-static int getkey() {
-  int character;
-  struct termios new_term_attr;
-
-  /* set the terminal to raw mode */
-  tcgetattr(fileno(stdin), &orig_term_attr);
-  memcpy(&new_term_attr, &orig_term_attr, sizeof(struct termios));
-  new_term_attr.c_lflag &= ~(ECHO | ICANON);
-  // new_term_attr.c_cc[VTIME] = 0;
-  // new_term_attr.c_cc[VMIN] = 0;
-  tcsetattr(fileno(stdin), TCSANOW, &new_term_attr);
-
-  /* read a character from the stdin stream without blocking */
-  /*   returns EOF (-1) if no character is available */
-  character = fgetc(stdin);
-
-  /* restore the original terminal attributes */
-  tcsetattr(fileno(stdin), TCSANOW, &orig_term_attr);
-
-  return character;
-}
-
 static void* send_msg_routine(void* arg) {
   struct client* me_p = (struct client*)arg;
   while (!should_input_stop) {
-    int key = getkey();
-    if (key == 'm') {
+    char key = getchar();
+    char newline = getchar();
+
+    if (key == 'm' && newline == '\n') {
       /* Now ask for a message from the user, this message
        * will be read by server
        */

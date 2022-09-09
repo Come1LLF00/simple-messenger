@@ -145,7 +145,7 @@ static void* client_handler(void* arg) {
 
     // check if connection to client lost
     if (count == 0 && errno != EAGAIN) {
-      fprintf(stderr, "[%d] lost connection\n", context.client);
+      // fprintf(stderr, "[%d] lost connection\n", context.client);
       goto out;
     }
 
