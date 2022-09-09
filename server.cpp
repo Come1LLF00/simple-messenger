@@ -68,13 +68,14 @@ int main(int argc, char* argv[]) {
 
   std::set<int> client_fds;
   std::set<pthread_t> clients;
+  struct {
+    struct sockaddr_in address;
+    unsigned int length;
+    int fd;
+  } client;
+  struct clients_context client_context = {&client_fds, client.fd};
   while (1) {
     /* Accept actual connection from the client */
-    struct {
-      struct sockaddr_in address;
-      unsigned int length;
-      int fd;
-    } client;
     client.length = sizeof(client.address);
     client.fd = accept(server_fd, (struct sockaddr*)&(client.address),
                        &(client.length));
@@ -83,8 +84,6 @@ int main(int argc, char* argv[]) {
       perror("ERROR on accept");
       break;
     }
-
-    struct clients_context client_context = {&client_fds, client.fd};
 
     pthread_mutex_lock(&context_lock);
     client_fds.insert(client.fd);
