@@ -185,7 +185,7 @@ static void* client_handler(void* arg) {
                     now.date};
 
     payload.length = server_msg_serialize(response_msg, &(payload.text));
-
+    pthread_mutex_lock(&context_lock);
     for (auto client_fd : *(context.client_fds)) {
       count = send(client_fd, payload.text, payload.length, MSG_NOSIGNAL);
       if (count < 0 && client_fd == context.client) {
@@ -193,6 +193,7 @@ static void* client_handler(void* arg) {
         goto response_out;
       }
     }
+    pthread_mutex_unlock(&context_lock);
   }
 
 response_out:
