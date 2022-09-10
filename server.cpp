@@ -92,6 +92,8 @@ int main(int argc, char* argv[]) {
 
     struct clients_context* new_client_ctx_p =
         (struct clients_context*)malloc(sizeof(struct clients_context));
+    new_client_ctx_p->client_fds = &client_fds;
+    new_client_ctx_p->client = client.fd;
 
     pthread_t thread;
     pthread_create(&thread, NULL, client_handler, new_client_ctx_p);
