@@ -8,8 +8,8 @@
 
 #define bytes_to_uint32_t(bytes)                                      \
   {                                                                   \
-    (uint32_t)(bytes)[0], (uint32_t)(bytes)[1], (uint32_t)(bytes)[2], \
-        (uint32_t)(bytes)[3]                                          \
+    (uint32_t)((bytes)[0]), (uint32_t)((bytes)[1]), (uint32_t)((bytes)[2]), \
+        (uint32_t)((bytes)[3])                                          \
   }
 #define shift_to_date(msg, data)                                 \
   (data) + sizeof((msg).nickname_size) + ((msg).nickname_size) + \
@@ -73,7 +73,7 @@ static struct client_msg client_msg_deserialize(char* data) {
 
   uint32_t body_size = uint32_t_deserialize(datp);
   datp += sizeof(body_size);
-#if 0
+#if 1
   printf("deserialized sizes: %" PRIu32 "; %" PRIu32 "\n", nickname_size, body_size);
 #endif
   char* body = (char*)malloc(body_size);
