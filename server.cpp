@@ -117,7 +117,7 @@ static uint16_t parse_args(int argc, char** argv) {
   return (uint16_t)strtoul(argv[1], NULL, 10);
 }
 
-#define MAX_LENGTH 14000
+#define MAX_LENGTH 256
 
 static void* client_handler(void* arg) {
   struct clients_context* context_p = (struct clients_context*)arg;
@@ -127,7 +127,7 @@ static void* client_handler(void* arg) {
   time_t time_now;
   struct tm* local_time_now;
   struct {
-    char date[MAX_LENGTH];
+    char date[7];
     uint32_t date_size;
   } now;
 
@@ -139,31 +139,17 @@ static void* client_handler(void* arg) {
 
   while (1) {
     /* If connection is established then start communicating */
-    char buffer[MAX_LENGTH];
-    memset(buffer, 0, MAX_LENGTH);  // bzero(buffer, 256);
-    ssize_t count =
-        recv(context_p->client, buffer, MAX_LENGTH - 1, MSG_NOSIGNAL);
-
-    // check if connection to client lost
-    if (count == 0 && errno != EAGAIN) {
-      // fprintf(stderr, "[%d] lost connection\n", context.client);
-      goto out;
-    }
-
-    // check if no error while reading
-    if (count < 0) {
-      perror("ERROR reading from client socket");
-      goto out;
-    }
-
     // deserialize incoming message
-    received_msg = client_msg_deserialize(buffer);
+    received_msg = client_msg_deserialize(context_p->client);
+    if (received_msg.nickname_size == 0 && received_msg.nickname == NULL &&
+        received_msg.body_size == 0 && received_msg.body == NULL)
+      goto out;
 
     // save the current time
     time_now = time(NULL);
     local_time_now = localtime(&time_now);
 
-    strftime(now.date, MAX_LENGTH - 1, "%H:%M",
+    strftime(now.date, 6, "%H:%M",
              local_time_now);  // formatting the time buffer according to
                                // predefined format %H:%M
     now.date_size = (uint32_t)strlen(
@@ -185,6 +171,7 @@ static void* client_handler(void* arg) {
                     now.date_size,
                     now.date};
 
+    int count = 0;
     payload.length = server_msg_serialize(response_msg, &(payload.text));
     pthread_mutex_lock(&context_lock);
     for (auto client_fd : *(context_p->client_fds)) {

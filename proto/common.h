@@ -56,34 +56,60 @@ static size_t client_msg_serialize(struct client_msg msg, size_t extra_space,
   return length;
 }
 
-static uint32_t uint32_t_deserialize(char* data) {
-  uint32_t bytes = *((uint32_t*)data);
-  return ntohl(bytes);
+// static uint32_t uint32_t_deserialize(char* data) {
+//   uint32_t bytes = *((uint32_t*)data);
+//   return ntohl(bytes);
+// }
+
+static ssize_t read_field(int fd, void* field, size_t size) {
+  ssize_t count = recv(fd, field, size, MSG_NOSIGNAL);
+  if (count == 0 && errno != EAGAIN)
+    return -1;
+  else
+    return count;
 }
 
-static struct client_msg client_msg_deserialize(char* data) {
-  char* datp = data;
-  uint32_t nickname_size = uint32_t_deserialize(datp);
+static struct client_msg client_msg_deserialize(int fd) {
+  ssize_t count = 0;
+  uint32_t nickname_size = 0;
+  count = read_field(fd, &nickname_size, sizeof(uint32_t));
+  if (count != sizeof(uint32_t)) return {0, 0, 0, 0};
+  nickname_size = ntohl(nickname_size);
+
 #if 0
   printf("nickname length: %x\n", nickname_size);
 #endif
-  datp += sizeof(nickname_size);
 
   char* nickname = (char*)malloc(nickname_size);
+  count = read_field(fd, nickname, nickname_size);
+  if (count != nickname_size) {
+    free(nickname);
+    return {0, 0, 0, 0};
+  }
 #if 0
   printf("Got message from: %.*s\n", nickname_size, datp);
 #endif
 
-  memcpy(nickname, datp, nickname_size);
-  datp += nickname_size;
+  uint32_t body_size = 0;
+  count = read_field(fd, &body_size, sizeof(uint32_t));
+  if (count != sizeof(uint32_t)) {
+    free(nickname);
+    return {0, 0, 0, 0};
+  }
+  body_size = ntohl(body_size);
 
-  uint32_t body_size = uint32_t_deserialize(datp);
-  datp += sizeof(body_size);
 #if 0
   printf("deserialized sizes: %" PRIu32 "; %" PRIu32 "\n", nickname_size, body_size);
 #endif
+
   char* body = (char*)malloc(body_size);
-  memcpy(body, datp, body_size);
+  count = read_field(fd, body, body_size);
+  if (count != body_size) {
+    free(body);
+    free(nickname);
+    return {0, 0, 0, 0};
+  }
+  // memcpy(body, datp, body_size); // there is problem
 
   return {nickname_size, nickname, body_size, body};
 }

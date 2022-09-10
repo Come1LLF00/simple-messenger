@@ -74,25 +74,32 @@ int main(int argc, char* argv[]) {
   int return_code = 0;
   while (1) {
     /* Now read server response */
-    char buffer[MAX_LENGTH];
-    memset(buffer, 0, MAX_LENGTH);  // bzero(buffer, 256);
-    ssize_t n = recv(me.sockfd, buffer, MAX_LENGTH - 1, MSG_NOSIGNAL);
+    // char buffer[MAX_LENGTH];
+    // memset(buffer, 0, MAX_LENGTH);  // bzero(buffer, 256);
+    // ssize_t n = recv(me.sockfd, buffer, MAX_LENGTH - 1, MSG_NOSIGNAL);
 
-    if (n == 0 && errno != EAGAIN) {
-      fprintf(stderr, "Connection lost\n");
+    // if (n == 0 && errno != EAGAIN) {
+    //   fprintf(stderr, "Connection lost\n");
+    //   should_input_stop = true;
+    //   return_code = 1;
+    //   break;
+    // }
+
+    // if (n < 0) {
+    //   perror("ERROR reading from server socket");
+    //   should_input_stop = true;
+    //   return_code = errno;
+    //   break;
+    // }
+
+    struct server_msg response = server_msg_deserialize(me.sockfd);
+    if (response.nickname_size == 0 && response.nickname == NULL &&
+        response.body_size == 0 && response.body == NULL &&
+        response.date_size == 0 && response.date == NULL) {
       should_input_stop = true;
       return_code = 1;
       break;
     }
-
-    if (n < 0) {
-      perror("ERROR reading from server socket");
-      should_input_stop = true;
-      return_code = errno;
-      break;
-    }
-
-    struct server_msg response = server_msg_deserialize(buffer);
 #if 0
     printf("sizes: %" PRIu32 "; %" PRIu32 "; %" PRIu32 "\n", response.date_size, response.nickname_size, response.body_size);
 #endif
