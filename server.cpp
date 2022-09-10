@@ -117,7 +117,7 @@ static uint16_t parse_args(int argc, char** argv) {
   return (uint16_t)strtoul(argv[1], NULL, 10);
 }
 
-#define MAX_LENGTH 256
+#define MAX_LENGTH 512
 
 static void* client_handler(void* arg) {
   struct clients_context* context_p = (struct clients_context*)arg;
