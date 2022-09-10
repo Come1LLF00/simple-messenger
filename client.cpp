@@ -84,7 +84,7 @@ int main(int argc, char* argv[]) {
     }
 
     if (n < 0) {
-      perror("ERROR reading from socket");
+      perror("ERROR reading from server socket");
       should_input_stop = true;
       return_code = errno;
       break;
@@ -168,7 +168,7 @@ static void* send_msg_routine(void* arg) {
       free(message);
 
       if (n < 0) {
-        perror("ERROR writing to socket");
+        perror("ERROR writing to server socket");
         return (void*)(uintptr_t)1;
       }
     }
