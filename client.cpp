@@ -128,8 +128,12 @@ static struct client parse_args(int argc, char** argv) {
   me.port_nr = (uint16_t)strtoul(argv[2], NULL, 10);
   me.nickname = argv[3];
   me.nickname_size = strlen(argv[3]);
-  printf("port: %d, nickname: %s; nick_size: %zu\n", me.port_nr, me.nickname,
-         (size_t)me.nickname_size);
+  // printf("port: %d, nickname: %s; nick_size: %zu\n", me.port_nr, me.nickname,
+  //        (size_t)me.nickname_size);
+  if (me.nickname_size <= 0) {
+    fprintf(stderr, "Invalid nickname\n");
+    exit(EINVAL);
+  }
   return me;
 }
 
