@@ -73,9 +73,10 @@ int main(int argc, char* argv[]) {
     unsigned int length;
     int fd;
   } client;
-  struct clients_context client_context = {&client_fds, client.fd};
+
   while (1) {
     /* Accept actual connection from the client */
+
     client.length = sizeof(client.address);
     client.fd = accept(server_fd, (struct sockaddr*)&(client.address),
                        &(client.length));
@@ -89,13 +90,12 @@ int main(int argc, char* argv[]) {
     client_fds.insert(client.fd);
     pthread_mutex_unlock(&context_lock);
 
-    pthread_t thread;
-    pthread_create(&thread, NULL, client_handler, &client_context);
-    clients.insert(thread);
+    struct clients_context* new_client_ctx_p =
+        (struct clients_context*)malloc(sizeof(struct clients_context));
 
-    // pthread_mutex_lock(&context_lock);
-    // should_stop = should_stop || client_fds.size() == 0;
-    // pthread_mutex_unlock(&context_lock);
+    pthread_t thread;
+    pthread_create(&thread, NULL, client_handler, new_client_ctx_p);
+    clients.insert(thread);
   }
 
   // wait until all clients shutdown
@@ -119,7 +119,6 @@ static uint16_t parse_args(int argc, char** argv) {
 
 static void* client_handler(void* arg) {
   struct clients_context* context_p = (struct clients_context*)arg;
-  struct clients_context context(context_p->client_fds, context_p->client);
 
   struct client_msg received_msg;
 
@@ -140,7 +139,8 @@ static void* client_handler(void* arg) {
     /* If connection is established then start communicating */
     char buffer[MAX_LENGTH];
     memset(buffer, 0, MAX_LENGTH);  // bzero(buffer, 256);
-    ssize_t count = recv(context.client, buffer, MAX_LENGTH - 1, MSG_NOSIGNAL);
+    ssize_t count =
+        recv(context_p->client, buffer, MAX_LENGTH - 1, MSG_NOSIGNAL);
 
     // check if connection to client lost
     if (count == 0 && errno != EAGAIN) {
@@ -185,9 +185,9 @@ static void* client_handler(void* arg) {
 
     payload.length = server_msg_serialize(response_msg, &(payload.text));
     pthread_mutex_lock(&context_lock);
-    for (auto client_fd : *(context.client_fds)) {
+    for (auto client_fd : *(context_p->client_fds)) {
       count = send(client_fd, payload.text, payload.length, MSG_NOSIGNAL);
-      if (count < 0 && client_fd == context.client) {
+      if (count < 0 && client_fd == context_p->client) {
         fprintf(stderr, "ERROR writing to socket[%d]", client_fd);
         goto response_out;
       }
@@ -205,10 +205,10 @@ response_out:
 out:
   // removing lost client socket fd
   pthread_mutex_lock(&context_lock);
-  context.client_fds->erase(context.client);
+  context_p->client_fds->erase(context_p->client);
+  shutdown(context_p->client, SHUT_RDWR);
+  close(context_p->client);
+  free(context_p);
   pthread_mutex_unlock(&context_lock);
-
-  shutdown(context.client, SHUT_RDWR);
-  close(context.client);
   return nullptr;
 }
