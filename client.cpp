@@ -128,7 +128,7 @@ static struct client parse_args(int argc, char** argv) {
   me.port_nr = (uint16_t)strtoul(argv[2], NULL, 10);
   me.nickname = argv[3];
   me.nickname_size = strlen(argv[3]);
-  fprintf(stderr, "port: %d, nickname: %s; nick_size: %zu\n", me.port_nr,
+  printf("port: %d, nickname: %s; nick_size: %zu\n", me.port_nr,
           me.nickname, (size_t)me.nickname_size);
   return me;
 }
