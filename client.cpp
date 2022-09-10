@@ -17,6 +17,8 @@
 
 #include "proto/client.h"
 
+#define MAX_LENGTH 14000
+
 struct client {
   int sockfd;
   struct hostent* server;
@@ -72,9 +74,9 @@ int main(int argc, char* argv[]) {
   int return_code = 0;
   while (1) {
     /* Now read server response */
-    char buffer[256];
-    memset(buffer, 0, 256);  // bzero(buffer, 256);
-    ssize_t n = recv(me.sockfd, buffer, 255, MSG_NOSIGNAL);
+    char buffer[MAX_LENGTH];
+    memset(buffer, 0, MAX_LENGTH);  // bzero(buffer, 256);
+    ssize_t n = recv(me.sockfd, buffer, MAX_LENGTH - 1, MSG_NOSIGNAL);
 
     if (n == 0 && errno != EAGAIN) {
       fprintf(stderr, "Connection lost\n");
@@ -162,6 +164,8 @@ static void* send_msg_routine(void* arg) {
       size_t payload_length = client_msg_serialize(
           {me_p->nickname_size, me_p->nickname, (uint32_t)msg_length, message},
           0, &payload);
+      ssize_t n = 0;
+      if (msg_length == 0) goto msg_free;
 #if 0
       printf("sent sizes: %" PRIu32 "; %zu\n", me_p->nickname_size, msg_length);
       printf("[%.*s]: %.*s",
@@ -169,7 +173,8 @@ static void* send_msg_routine(void* arg) {
         (int) msg_length, message);
 #endif
 
-      ssize_t n = send(me_p->sockfd, payload, payload_length, MSG_NOSIGNAL);
+      n = send(me_p->sockfd, payload, payload_length, MSG_NOSIGNAL);
+    msg_free:
       free(payload);
       free(message);
 
@@ -177,7 +182,8 @@ static void* send_msg_routine(void* arg) {
         perror("ERROR writing to server socket");
         return (void*)(uintptr_t)1;
       }
-    }
+    } else
+      fflush(stdin);
   }
 
   return nullptr;
