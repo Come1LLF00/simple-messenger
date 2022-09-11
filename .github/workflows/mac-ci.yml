@@ -10,8 +10,6 @@ jobs:
     runs-on: macos-latest
     steps:
     - uses: actions/checkout@v2
-    - name: format
-      run: make clang_format
     - name: tidy
       run: make clang_tidy
     - name: build
