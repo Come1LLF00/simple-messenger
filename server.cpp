@@ -117,8 +117,6 @@ static uint16_t parse_args(int argc, char** argv) {
   return (uint16_t)strtoul(argv[1], NULL, 10);
 }
 
-#define MAX_LENGTH 256
-
 static void* client_handler(void* arg) {
   struct clients_context* context_p = (struct clients_context*)arg;
 
@@ -157,9 +155,9 @@ static void* client_handler(void* arg) {
 
     // printf("sizes: %" PRIu32 "; %" PRIu32 "; %" PRIu32"\n", now_len,
     // received_msg.nickname_size, received_msg.body_size);
-    fprintf(stderr, "{%.*s} [%.*s] %.*s", (int)now.date_size, now.date,
-            (int)received_msg.nickname_size, received_msg.nickname,
-            (int)received_msg.body_size, received_msg.body);
+    printf("{%.*s} [%.*s] %.*s", (int)now.date_size, now.date,
+           (int)received_msg.nickname_size, received_msg.nickname,
+           (int)received_msg.body_size, received_msg.body);
 
     /* write a response to the clients */
 
