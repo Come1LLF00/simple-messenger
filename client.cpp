@@ -103,7 +103,7 @@ int main(int argc, char* argv[]) {
 #if 0
     printf("sizes: %" PRIu32 "; %" PRIu32 "; %" PRIu32 "\n", response.date_size, response.nickname_size, response.body_size);
 #endif
-    printf("{%.*s} [%.*s]: %.*s", (int)response.date_size, response.date,
+    printf("{%.*s} [%.*s] %.*s", (int)response.date_size, response.date,
            (int)response.nickname_size, response.nickname,
            (int)response.body_size, response.body);
 
@@ -188,7 +188,7 @@ static void* send_msg_routine(void* arg) {
 
       if (n < 0) {
         perror("ERROR writing to server socket");
-        return (void*)(uintptr_t)1;
+        return (void*)(uintptr_t)errno;
       }
     } else
       fflush(stdin);

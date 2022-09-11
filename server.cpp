@@ -157,7 +157,7 @@ static void* client_handler(void* arg) {
 
     // printf("sizes: %" PRIu32 "; %" PRIu32 "; %" PRIu32"\n", now_len,
     // received_msg.nickname_size, received_msg.body_size);
-    fprintf(stderr, "{%.*s} [%.*s]: %.*s", (int)now.date_size, now.date,
+    fprintf(stderr, "{%.*s} [%.*s] %.*s", (int)now.date_size, now.date,
             (int)received_msg.nickname_size, received_msg.nickname,
             (int)received_msg.body_size, received_msg.body);
 
