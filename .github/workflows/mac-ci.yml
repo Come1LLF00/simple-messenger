@@ -1,0 +1,26 @@
+# CI on Mac OS for simple-messenger
+
+
+name: simple-messenger-mac-os-
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: format
+      run: make clang_format
+    - name: tidy
+      run: make clang_tidy
+    - name: build
+      run: make
+    - uses: actions/upload-artifact@v3
+      with:
+        name: simple-messenger
+        path: |
+          client: ./client
+          server: ./server
+          README: ./README.md
+
