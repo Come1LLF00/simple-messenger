@@ -130,10 +130,6 @@ static void* client_handler(void* arg) {
   } now;
 
   struct server_msg response_msg;
-  struct {
-    char* text;
-    size_t length;
-  } payload;
 
   while (1) {
     /* If connection is established then start communicating */
@@ -170,10 +166,9 @@ static void* client_handler(void* arg) {
                     now.date};
 
     int count = 0;
-    payload.length = server_msg_serialize(response_msg, &(payload.text));
     pthread_mutex_lock(&context_lock);
     for (auto client_fd : *(context_p->client_fds)) {
-      count = send(client_fd, payload.text, payload.length, MSG_NOSIGNAL);
+      count = server_msg_serialize(client_fd, response_msg);
       if (count < 0 && client_fd == context_p->client) {
         fprintf(stderr, "ERROR writing to socket[%d]", client_fd);
         goto response_out;
@@ -183,9 +178,6 @@ static void* client_handler(void* arg) {
   }
 
 response_out:
-  // freeing allocated buffers
-  free(payload.text);
-
   free(received_msg.nickname);
   free(received_msg.body);
 

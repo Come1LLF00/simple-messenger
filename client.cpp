@@ -166,14 +166,12 @@ static void* send_msg_routine(void* arg) {
       }
 
       /* Send message to the server */
-      size_t msg_length = strlen(message);
-      char* payload = NULL;
-      size_t payload_length = 0;
+      const size_t msg_length = strlen(message);
       ssize_t n = 0;
       if (msg_length == 0) goto msg_free;
-      payload_length = client_msg_serialize(
-          {me_p->nickname_size, me_p->nickname, (uint32_t)msg_length, message},
-          0, &payload);
+      n = client_msg_serialize(
+          me_p->sockfd,
+          {me_p->nickname_size, me_p->nickname, (uint32_t)msg_length, message});
 #if 0
       printf("sent sizes: %" PRIu32 "; %zu\n", me_p->nickname_size, msg_length);
       printf("[%.*s]: %.*s",
@@ -181,8 +179,6 @@ static void* send_msg_routine(void* arg) {
         (int) msg_length, message);
 #endif
 
-      n = send(me_p->sockfd, payload, payload_length, MSG_NOSIGNAL);
-      free(payload);
     msg_free:
       free(message);
 

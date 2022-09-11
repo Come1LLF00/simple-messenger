@@ -3,20 +3,26 @@
 
 #include "common.h"
 
-static size_t server_msg_serialize(struct server_msg msg, char** datpp) {
+static ssize_t server_msg_serialize(int fd, struct server_msg msg) {
   struct client_msg temp = {msg.nickname_size, msg.nickname, msg.body_size,
                             msg.body};
+  ssize_t total_bytes = 0;
+  ssize_t result = client_msg_serialize(fd, temp);
+  if (result == -1) return -1;
 
-  size_t date_length = sizeof(msg.date_size) + msg.date_size;
-  size_t total_length = client_msg_serialize(temp, date_length, datpp);
-  char* datp = shift_to_date(msg, *datpp);
+  total_bytes += result;
 
   uint32_t net_date_size = htonl(msg.date_size);
-  memcpy(datp, &net_date_size, sizeof(net_date_size));
-  datp += sizeof(msg.date_size);
+  result = write_field(fd, &net_date_size, sizeof(uint32_t));
+  if (result != sizeof(uint32_t)) return -1;
 
-  memcpy(datp, msg.date, msg.date_size);
-  return total_length;
+  total_bytes += result;
+
+  result = write_field(fd, msg.date, msg.date_size);
+  if (result != msg.date_size) return -1;
+
+  total_bytes += result;
+  return total_bytes;
 }
 
 #endif /* _SERVER_H_ */

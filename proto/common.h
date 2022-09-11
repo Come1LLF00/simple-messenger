@@ -34,35 +34,45 @@ struct server_msg {
   char* date;
 };
 
-static size_t client_msg_serialize(struct client_msg msg, size_t extra_space,
-                                   char** datpp) {
-  size_t length = sizeof(msg.nickname_size) + msg.nickname_size +
-                  sizeof(msg.body_size) + msg.body_size + extra_space;
-  *datpp = (char*)malloc(length);
-  char* datp = *datpp;
+static ssize_t write_field(int fd, void* field, size_t size) {
+  size_t count = 0;
+  while (size - count > 0) {
+    ssize_t result = send(fd, (char*)field + count, size - count, MSG_NOSIGNAL);
+    if (result <= 0) return -1;
 
-  uint32_t net_nickname_size = htonl(msg.nickname_size);
-  memcpy(datp, &net_nickname_size, sizeof(net_nickname_size));
-  datp += sizeof(msg.nickname_size);
-
-  memcpy(datp, msg.nickname, msg.nickname_size);
-  datp += msg.nickname_size;
-
-  uint32_t net_body_size = htonl(msg.body_size);
-  memcpy(datp, &net_body_size, sizeof(net_body_size));
-  datp += sizeof(msg.body_size);
-
-  memcpy(datp, msg.body, msg.body_size);
-  return length;
+    count += result;
+  }
+  return count;
 }
 
-// static uint32_t uint32_t_deserialize(char* data) {
-//   uint32_t bytes = *((uint32_t*)data);
-//   return ntohl(bytes);
-// }
+static ssize_t client_msg_serialize(int fd, struct client_msg msg) {
+  ssize_t total_bytes = 0;
+  uint32_t net_nick_size = htonl(msg.nickname_size);
+  ssize_t result = write_field(fd, &net_nick_size, sizeof(uint32_t));
+  if (result != sizeof(uint32_t)) return -1;
+
+  total_bytes += result;
+
+  result = write_field(fd, msg.nickname, msg.nickname_size);
+  if (result != msg.nickname_size) return -1;
+
+  total_bytes += result;
+
+  uint32_t net_body_size = htonl(msg.body_size);
+  result = write_field(fd, &net_body_size, sizeof(u_int32_t));
+  if (result != sizeof(uint32_t)) return -1;
+
+  total_bytes += result;
+
+  result = write_field(fd, msg.body, msg.body_size);
+  if (result != msg.body_size) return -1;
+
+  total_bytes += result;
+  return total_bytes;
+}
 
 static ssize_t read_field(int fd, void* field, size_t size) {
-  ssize_t count = recv(fd, field, size, MSG_NOSIGNAL);
+  ssize_t count = recv(fd, field, size, MSG_NOSIGNAL | MSG_WAITALL);
   if (count == 0 && errno != EAGAIN)
     return -1;
   else
