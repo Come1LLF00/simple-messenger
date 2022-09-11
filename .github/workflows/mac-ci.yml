@@ -24,7 +24,7 @@ jobs:
       with:
         name: simple-messenger
         path: |
-          client: ./client
-          server: ./server
-          README: ./README.md
+          ./client
+          ./server
+          ./README.md
 
