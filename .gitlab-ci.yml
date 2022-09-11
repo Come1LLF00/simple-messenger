@@ -33,6 +33,9 @@ tests:
   script:
     - bash tests
   artifacts:
+    untracked: true
     when: always
     reports:
       junit: results/TEST-tests.xml
+    paths:
+      - .
