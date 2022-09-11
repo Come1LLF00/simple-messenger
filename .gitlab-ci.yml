@@ -38,4 +38,4 @@ tests:
     reports:
       junit: results/TEST-tests.xml
     paths:
-      - .
+      - ./*
