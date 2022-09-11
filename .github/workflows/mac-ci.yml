@@ -10,10 +10,10 @@ jobs:
     runs-on: macos-latest
     steps:
     - uses: actions/checkout@v2
-    - uses: egor-tensin/setup-clang@v1
-      with:
-        version: latest
-        platform: x64
+    - name: install clang-format
+      run: brew install clang-format
+    - name: install clang-tidy
+      run: brew install clang-tidy
     - name: format
       run: make clang_format
     - name: tidy
