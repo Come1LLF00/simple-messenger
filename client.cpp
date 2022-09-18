@@ -17,7 +17,7 @@
 
 #include "proto/client.h"
 
-#define MAX_LENGTH 14000
+// #define MAX_LENGTH 14000
 
 struct client {
   int sockfd;
